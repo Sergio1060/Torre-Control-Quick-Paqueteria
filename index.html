@@ -418,10 +418,35 @@
     Reprogramar:   "var(--cat-6)",
     Investigacion: "var(--cat-7)"
   };
+  function sane(d){
+    // guards against single-digit typos in the source export (e.g. "2926" for
+    // "2026") blowing up every date-based calculation on the page
+    if(!d || isNaN(d.getTime())) return null;
+    var y = d.getFullYear();
+    return (y>=2000 && y<=2100) ? d : null;
+  }
   function parseDate(s){
     if(!s) return null;
-    var d = new Date(s.replace(" ","T"));
-    return isNaN(d.getTime()) ? null : d;
+    s = String(s).trim();
+    if(!s) return null;
+
+    // Excel serial date/time (exports sometimes dump the raw cell value instead of
+    // the formatted date, with a comma as decimal separator): "46286,72852"
+    if(/^\d{4,6}([.,]\d+)?$/.test(s)){
+      var serial = parseFloat(s.replace(",","."));
+      if(!isNaN(serial) && serial>20000 && serial<80000){
+        return sane(new Date(Math.round((serial-25569)*86400*1000)));
+      }
+    }
+
+    // DD-MM-YYYY or DD/MM/YYYY, optional HH:mm[:ss]
+    var m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if(m){
+      return sane(new Date(+m[3], +m[2]-1, +m[1], +(m[4]||0), +(m[5]||0), +(m[6]||0)));
+    }
+
+    // ISO-like YYYY-MM-DD[ T]HH:mm:ss
+    return sane(new Date(s.replace(" ","T")));
   }
   function fmtDate(d){
     if(!d) return "&mdash;";
