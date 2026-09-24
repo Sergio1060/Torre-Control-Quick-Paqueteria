@@ -312,7 +312,7 @@
       <div class="upload-box">
         <input type="file" id="csvInput" accept=".csv,text/csv" hidden>
         <button type="button" class="upload-btn" id="uploadBtn">Cargar CSV del d&iacute;a</button>
-        <button type="button" class="sample-link" id="sampleBtn" hidden>usar datos de muestra</button>
+        <button type="button" class="sample-link" id="sampleBtn" hidden>usar datos compartidos</button>
       </div>
     </div>
     <p class="meta" id="metaLine">Cargando datos&hellip;</p>
@@ -412,7 +412,7 @@
     </div>
   </section>
 
-  <footer>Panel de Entregas &middot; fuente actual: <span id="srcName">Servicios</span> &middot; carga un CSV nuevo cada d&iacute;a con el bot&oacute;n superior para actualizar</footer>
+  <footer>Panel de Entregas &middot; fuente actual: <span id="srcName">Servicios</span> &middot; "Cargar CSV del d&iacute;a" solo cambia lo que ves en este navegador &mdash; para actualizar lo que ven todos, env&iacute;a el archivo del d&iacute;a</footer>
 </div>
 
 <script>
@@ -584,9 +584,9 @@
   }
 
   function loadSample(){
-    document.getElementById("metaLine").textContent = "Cargando datos de muestra…";
+    document.getElementById("metaLine").textContent = "Cargando datos…";
     fetch("servicios.json").then(function(r){return r.json();}).then(function(rows){
-      ingest(rows, "datos de muestra", false);
+      ingest(rows, "servicios.json (compartido)", false);
     }).catch(function(err){
       document.getElementById("metaLine").textContent = "No se pudieron cargar los datos: "+err;
     });
