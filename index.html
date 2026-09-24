@@ -300,7 +300,7 @@
     <div class="head-top">
       <div class="head-copy">
         <h1>Panel de Entregas</h1>
-        <p>Seguimiento de servicios por cliente, destinatario y ciudad de destino &mdash; excluye pedidos en estado <strong>No asignado</strong>.</p>
+        <p>Seguimiento de servicios por cliente, destinatario y ciudad de destino &mdash; excluye pedidos en estado <strong>No asignado</strong> y <strong>Cancelado</strong>.</p>
       </div>
       <div class="upload-box">
         <input type="file" id="csvInput" accept=".csv,text/csv" hidden>
@@ -521,7 +521,8 @@
   function ingest(rawRows, sourceLabel, isUploaded){
     now = new Date(0);
     ALL = rawRows.filter(function(r){
-      return (r.estado||"").trim().toLowerCase() !== "no asignado";
+      var e = (r.estado||"").trim().toLowerCase();
+      return e !== "no asignado" && e !== "cancelado";
     }).map(function(r){
       var fc = parseDate(r.fechaCreacion);
       var corregida = CORRECTIONS[(r.guia||"").trim()];
@@ -543,7 +544,7 @@
     });
     state.cedi.clear(); state.cliente.clear(); state.ciudad.clear(); state.estado.clear();
     document.getElementById("metaLine").innerHTML =
-      ALL.length+" servicios (excl. No asignado) &middot; datos al "+fmtDate(now)+" &middot; fuente: "+esc(sourceLabel);
+      ALL.length+" servicios (excl. No asignado y Cancelado) &middot; datos al "+fmtDate(now)+" &middot; fuente: "+esc(sourceLabel);
     document.getElementById("srcName").textContent = sourceLabel;
     document.getElementById("sampleBtn").hidden = !isUploaded;
     buildFilterOptions();
@@ -747,15 +748,14 @@
     document.getElementById("countPill").innerHTML = "<b>"+rows.length+"</b> de <b>"+ALL.length+"</b> servicios";
 
     var finalizados = rows.filter(function(r){return r.estado==="Finalizado";});
-    var cancelados = rows.filter(function(r){return r.estado==="Cancelado";});
-    var pendientes = rows.filter(function(r){return r.estado!=="Finalizado" && r.estado!=="Cancelado";});
+    var pendientes = rows.filter(function(r){return r.estado!=="Finalizado";});
 
     var gestionDias = finalizados.filter(function(r){return r.fc&&r.ff;}).map(function(r){return (r.ff-r.fc)/86400000;});
     var avgGestion = gestionDias.length ? gestionDias.reduce(function(a,b){return a+b;},0)/gestionDias.length : null;
     var antigDias = pendientes.filter(function(r){return r.fc;}).map(function(r){return (now-r.fc)/86400000;});
     var avgAntig = antigDias.length ? antigDias.reduce(function(a,b){return a+b;},0)/antigDias.length : null;
 
-    renderKpis(rows.length, finalizados.length, pendientes.length, cancelados.length, avgGestion, avgAntig);
+    renderKpis(rows.length, finalizados.length, pendientes.length, avgGestion, avgAntig);
     renderEstadoChart(rows);
     renderCediChart(rows);
     renderCiudadChart(rows);
@@ -764,13 +764,12 @@
     renderFinTable(finalizados);
   }
 
-  function renderKpis(total, fin, pend, canc, avgGestion, avgAntig){
+  function renderKpis(total, fin, pend, avgGestion, avgAntig){
     var pct = total ? Math.round(fin/total*100) : 0;
     var kpis = [
-      {label:"Total servicios", value:total, sub:"excl. No asignado", cls:""},
+      {label:"Total servicios", value:total, sub:"excl. No asignado y Cancelado", cls:""},
       {label:"Finalizados", value:fin, sub:pct+"% del total", cls:"good"},
       {label:"Pendientes", value:pend, sub:avgAntig!=null ? ("prom. "+avgAntig.toFixed(1)+" d antig&uuml;edad") : "&mdash;", cls:"warning"},
-      {label:"Cancelados", value:canc, sub:total ? Math.round(canc/total*100)+"% del total" : "&mdash;", cls:"critical"},
       {label:"Tiempo de gesti&oacute;n", value: avgGestion!=null ? avgGestion.toFixed(1) : "&mdash;", sub:"d&iacute;as promedio (creado &rarr; finalizado)", cls:""}
     ];
     document.getElementById("kpis").innerHTML = kpis.map(function(k){
