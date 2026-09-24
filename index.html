@@ -602,10 +602,16 @@
   function setupMsel(key, allLabel){
     var root = mselRoot(key);
     var btn = root.querySelector(".msel-btn");
+    var panel = root.querySelector(".msel-panel");
     var list = root.querySelector("[data-list]");
     var search = root.querySelector("[data-search]");
     var valEl = root.querySelector("[data-val]");
     var options = [];
+
+    // Keep clicks inside the panel (checkboxes, search, Todos/Ninguno) from
+    // bubbling to the document click handler that closes open dropdowns —
+    // otherwise picking a second option would close the panel first.
+    panel.addEventListener("click", function(e){ e.stopPropagation(); });
 
     function renderList(filter){
       var f = (filter||"").toLowerCase();
