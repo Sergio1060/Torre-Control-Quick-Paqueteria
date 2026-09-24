@@ -282,6 +282,13 @@
   }
   .sample-link:hover{color:var(--ink);}
   .upload-err{color:var(--critical); font-size:12.5px; margin:8px 0 0; max-width:60ch;}
+  .empty-notice{
+    color:#8a5a00; font-size:12.5px; margin:8px 0 0; max-width:60ch;
+    background:rgba(250,178,25,0.14); border:1px solid rgba(250,178,25,0.35);
+    border-radius:8px; padding:8px 12px;
+  }
+  :root:not([data-theme="light"]) .empty-notice{color:var(--warning);}
+  :root[data-theme="dark"] .empty-notice{color:var(--warning);}
 
   footer{padding-block:22px 30px; color:var(--ink-muted); font-size:12px; text-align:center;}
 
@@ -310,6 +317,7 @@
     </div>
     <p class="meta" id="metaLine">Cargando datos&hellip;</p>
     <p class="upload-err" id="uploadErr" hidden></p>
+    <p class="empty-notice" id="emptyNotice" hidden></p>
   </header>
 
   <nav class="filterbar" id="filterbar" aria-label="Filtros">
@@ -521,9 +529,12 @@
   // ---------- Data ingestion ----------
   function ingest(rawRows, sourceLabel, isUploaded){
     now = new Date(0);
+    var excluidosNoAsignado = 0, excluidosCancelado = 0;
     ALL = rawRows.filter(function(r){
       var e = (r.estado||"").trim().toLowerCase();
-      return e !== "no asignado" && e !== "cancelado";
+      if(e==="no asignado"){ excluidosNoAsignado++; return false; }
+      if(e==="cancelado"){ excluidosCancelado++; return false; }
+      return true;
     }).map(function(r){
       var fc = parseDate(r.fechaCreacion);
       var corregida = CORRECTIONS[(r.guia||"").trim()];
@@ -550,8 +561,22 @@
       };
     });
     state.cedi.clear(); state.cliente.clear(); state.ciudad.clear(); state.estado.clear();
-    document.getElementById("metaLine").innerHTML =
-      ALL.length+" servicios (excl. No asignado y Cancelado) &middot; datos al "+fmtDate(now)+" &middot; fuente: "+esc(sourceLabel);
+    var emptyNotice = document.getElementById("emptyNotice");
+    if(ALL.length===0){
+      document.getElementById("metaLine").innerHTML =
+        "0 servicios &middot; fuente: "+esc(sourceLabel);
+      var motivos = [];
+      if(excluidosNoAsignado) motivos.push(excluidosNoAsignado+' en "No asignado"');
+      if(excluidosCancelado) motivos.push(excluidosCancelado+' en "Cancelado"');
+      emptyNotice.textContent = rawRows.length
+        ? "Este archivo trae "+rawRows.length+" fila(s), pero todas quedaron excluidas ("+motivos.join(" y ")+"), que son los estados que este panel ignora a propósito. No hay nada más que mostrar."
+        : "Este archivo no trajo ninguna fila de datos.";
+      emptyNotice.hidden = false;
+    } else {
+      document.getElementById("metaLine").innerHTML =
+        ALL.length+" servicios (excl. No asignado y Cancelado) &middot; datos al "+fmtDate(now)+" &middot; fuente: "+esc(sourceLabel);
+      emptyNotice.hidden = true;
+    }
     document.getElementById("srcName").textContent = sourceLabel;
     document.getElementById("sampleBtn").hidden = !isUploaded;
     buildFilterOptions();
@@ -705,6 +730,7 @@
     this.value = "";
     if(!file) return;
     document.getElementById("uploadErr").hidden = true;
+    document.getElementById("emptyNotice").hidden = true;
     var reader = new FileReader();
     reader.onload = function(){
       var text = String(reader.result);
