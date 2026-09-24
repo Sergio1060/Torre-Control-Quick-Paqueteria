@@ -291,6 +291,7 @@
     .barrow{grid-template-columns:90px 1fr 36px;}
   }
 </style>
+
 </head>
 <body>
 
@@ -299,7 +300,7 @@
     <div class="head-top">
       <div class="head-copy">
         <h1>Panel de Entregas</h1>
-        <p>Seguimiento de servicios por CEDI, cliente y ciudad de destino &mdash; excluye pedidos en estado <strong>No asignado</strong>.</p>
+        <p>Seguimiento de servicios por cliente, destinatario y ciudad de destino &mdash; excluye pedidos en estado <strong>No asignado</strong>.</p>
       </div>
       <div class="upload-box">
         <input type="file" id="csvInput" accept=".csv,text/csv" hidden>
@@ -313,18 +314,18 @@
 
   <nav class="filterbar" id="filterbar" aria-label="Filtros">
     <div class="msel" data-key="cedi">
-      <button class="msel-btn" type="button"><span class="lbl">CEDI</span><span class="val" data-val>Todos</span><span class="car">&#9662;</span></button>
+      <button class="msel-btn" type="button"><span class="lbl">Cliente</span><span class="val" data-val>Todos</span><span class="car">&#9662;</span></button>
       <div class="msel-panel">
-        <div class="msel-search"><input type="text" placeholder="Buscar CEDI&hellip;" data-search></div>
+        <div class="msel-search"><input type="text" placeholder="Buscar cliente&hellip;" data-search></div>
         <div class="msel-actions"><button type="button" data-all>Todos</button><button type="button" data-none>Ninguno</button></div>
         <div class="msel-list" data-list></div>
       </div>
     </div>
 
     <div class="msel" data-key="cliente">
-      <button class="msel-btn" type="button"><span class="lbl">Cliente (CEDI)</span><span class="val" data-val>Todos</span><span class="car">&#9662;</span></button>
+      <button class="msel-btn" type="button"><span class="lbl">Destinatario (Cliente)</span><span class="val" data-val>Todos</span><span class="car">&#9662;</span></button>
       <div class="msel-panel">
-        <div class="msel-search"><input type="text" placeholder="Buscar cliente&hellip;" data-search></div>
+        <div class="msel-search"><input type="text" placeholder="Buscar destinatario&hellip;" data-search></div>
         <div class="msel-actions"><button type="button" data-all>Todos</button><button type="button" data-none>Ninguno</button></div>
         <div class="msel-list" data-list></div>
       </div>
@@ -346,15 +347,15 @@
 
   <section class="kpis" id="kpis" aria-label="Indicadores clave"></section>
 
-  <section class="row2" aria-label="Distribuci&oacute;n por estado y CEDI">
+  <section class="row2" aria-label="Distribuci&oacute;n por estado y cliente">
     <div class="card">
       <h2>Distribuci&oacute;n por estado<button type="button" class="card-clear" id="estadoClear" hidden>quitar filtro</button></h2>
       <p class="card-sub">Cantidad de servicios en cada estado del ciclo &mdash; clic para filtrar</p>
       <div class="barlist" id="estadoChart"></div>
     </div>
     <div class="card">
-      <h2>Servicios por CEDI</h2>
-      <p class="card-sub">Volumen de servicios gestionados por centro</p>
+      <h2>Servicios por cliente</h2>
+      <p class="card-sub">Volumen de servicios por cliente (CEDI unificados)</p>
       <div class="barlist" id="cediChart"></div>
     </div>
   </section>
@@ -383,7 +384,7 @@
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th>Gu&iacute;a</th><th>Cliente</th><th>CEDI</th><th>Ciudad</th><th>Estado</th><th>Creado</th><th class="num">D&iacute;as</th>
+            <th>Gu&iacute;a</th><th>Destinatario</th><th>Cliente</th><th>Ciudad</th><th>Estado</th><th>Creado</th><th class="num">D&iacute;as</th>
           </tr></thead>
           <tbody id="pendBody"></tbody>
         </table>
@@ -395,7 +396,7 @@
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th>Gu&iacute;a</th><th>Cliente</th><th>CEDI</th><th>Ciudad</th><th>Finalizado</th><th class="num">D&iacute;as gesti&oacute;n</th>
+            <th>Gu&iacute;a</th><th>Destinatario</th><th>Cliente</th><th>Ciudad</th><th>Finalizado</th><th class="num">D&iacute;as gesti&oacute;n</th>
           </tr></thead>
           <tbody id="finBody"></tbody>
         </table>
@@ -453,8 +454,15 @@
     var months=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
     return d.getDate()+" "+months[d.getMonth()]+" "+d.getFullYear();
   }
-  function shortCedi(name){
-    return (name||"").replace(/^CEDI\s+/i,"");
+  function brandOf(cedi){
+    // Unifies every CEDI location under its parent client/brand, e.g.
+    // "CEDI LOREAL BOGOTA" / "CEDI LOREAL MEDELLIN" / "LOREAL SANTANDER" -> "LOREAL",
+    // "CEDI SERVIENVIOS - SVC BIBLIAS" -> "SERVIENVIOS".
+    var c = (cedi||"").replace(/^CEDI\s+/i,"").trim();
+    var dashIdx = c.indexOf(" - ");
+    if(dashIdx>=0) c = c.slice(0, dashIdx).trim();
+    var firstWord = c.split(/\s+/)[0] || c;
+    return firstWord ? firstWord.toUpperCase() : "(Sin cliente)";
   }
   function esc(s){
     return (s==null?"":String(s)).replace(/[&<>"]/g, function(c){
@@ -466,6 +474,7 @@
   var ALL = [];
   var now = new Date(0);
   var STORE_CSV = "panelEntregas_csv", STORE_NAME = "panelEntregas_name";
+  var CORRECTIONS = {};
 
   // ---------- CSV parsing ----------
   var CSV_REQUIRED = ["Estado","Cliente","CEDI","Ciudad","Fecha de creacion"];
@@ -515,15 +524,21 @@
       return (r.estado||"").trim().toLowerCase() !== "no asignado";
     }).map(function(r){
       var fc = parseDate(r.fechaCreacion);
+      var corregida = CORRECTIONS[(r.guia||"").trim()];
+      if(corregida){
+        var fcCorr = parseDate(corregida);
+        if(fcCorr) fc = fcCorr;
+      }
       var ff = parseDate(r.fechaFinalizado);
       if(fc && fc>now) now = fc;
       if(ff && ff>now) now = ff;
       var cliente = (r.cliente||"").trim() || "(Sin nombre)";
       var cedi = (r.cedi||"").trim() || "(Sin CEDI)";
+      var marca = brandOf(cedi);
       return {
-        guia:r.guia, ruta:r.ruta, estado:r.estado, cliente:cliente, cedi:cedi,
+        guia:r.guia, ruta:r.ruta, estado:r.estado, cliente:cliente, cedi:cedi, marca:marca,
         ciudad:(r.ciudad||"").trim() || "(Sin ciudad)",
-        fc:fc, ff:ff, clienteKey:cliente+"|||"+cedi
+        fc:fc, ff:ff, clienteKey:cliente+"|||"+marca
       };
     });
     state.cedi.clear(); state.cliente.clear(); state.ciudad.clear(); state.estado.clear();
@@ -552,21 +567,21 @@
 
   // ---------- Filters ----------
   function buildFilterOptions(){
-    var cedis = uniqCount(ALL, function(r){return r.cedi;});
+    var marcas = uniqCount(ALL, function(r){return r.marca;});
     var ciudades = uniqCount(ALL, function(r){return r.ciudad;});
     var clientes = {};
     ALL.forEach(function(r){
-      if(!clientes[r.clienteKey]) clientes[r.clienteKey] = {cliente:r.cliente, cedi:r.cedi, n:0};
+      if(!clientes[r.clienteKey]) clientes[r.clienteKey] = {cliente:r.cliente, marca:r.marca, n:0};
       clientes[r.clienteKey].n++;
     });
     var clienteList = Object.keys(clientes).map(function(k){
-      return {key:k, cliente:clientes[k].cliente, cedi:clientes[k].cedi, n:clientes[k].n};
+      return {key:k, cliente:clientes[k].cliente, marca:clientes[k].marca, n:clientes[k].n};
     }).sort(function(a,b){return a.cliente.localeCompare(b.cliente);});
 
-    mselRoot("cedi")._setOptions(cedis.map(function(c){return {key:c.k, label:c.k, sub:c.n};}));
+    mselRoot("cedi")._setOptions(marcas.map(function(c){return {key:c.k, label:c.k, sub:c.n};}));
     mselRoot("ciudad")._setOptions(ciudades.map(function(c){return {key:c.k, label:c.k, sub:c.n};}));
     mselRoot("cliente")._setOptions(clienteList.map(function(c){
-      return {key:c.key, label:c.cliente+" ("+shortCedi(c.cedi)+")", sub:c.n};
+      return {key:c.key, label:c.cliente+" ("+c.marca+")", sub:c.n};
     }));
   }
   function mselRoot(key){ return document.querySelector('.msel[data-key="'+key+'"]'); }
@@ -641,7 +656,7 @@
   }
 
   // ---------- Initial load & CSV upload ----------
-  (function initialLoad(){
+  function startWithSavedOrSample(){
     var savedCsv = null, savedName = null;
     try{
       savedCsv = localStorage.getItem(STORE_CSV);
@@ -655,7 +670,12 @@
       }catch(e){ /* dato guardado inválido: usar muestra */ }
     }
     loadSample();
-  })();
+  }
+  fetch("recolectado.json").then(function(r){return r.json();}).then(function(map){
+    CORRECTIONS = map || {};
+  }).catch(function(){
+    CORRECTIONS = {};
+  }).then(startWithSavedOrSample);
 
   document.getElementById("uploadBtn").addEventListener("click", function(){
     document.getElementById("csvInput").click();
@@ -713,7 +733,7 @@
 
   function filtered(){
     return ALL.filter(function(r){
-      if(state.cedi.size && !state.cedi.has(r.cedi)) return false;
+      if(state.cedi.size && !state.cedi.has(r.marca)) return false;
       if(state.ciudad.size && !state.ciudad.has(r.ciudad)) return false;
       if(state.cliente.size && !state.cliente.has(r.clienteKey)) return false;
       if(state.estado.size && !state.estado.has(r.estado)) return false;
@@ -773,7 +793,7 @@
     // Counts ignore the estado filter itself so every bar stays visible & clickable,
     // but reflect the other active filters (cedi/cliente/ciudad).
     var base = ALL.filter(function(r){
-      if(state.cedi.size && !state.cedi.has(r.cedi)) return false;
+      if(state.cedi.size && !state.cedi.has(r.marca)) return false;
       if(state.ciudad.size && !state.ciudad.has(r.ciudad)) return false;
       if(state.cliente.size && !state.cliente.has(r.clienteKey)) return false;
       return true;
@@ -805,8 +825,8 @@
   }
 
   function renderCediChart(rows){
-    var counts = uniqCount(rows, function(r){return r.cedi;});
-    var data = counts.map(function(c){return {label:shortCedi(c.k), n:c.n};});
+    var counts = uniqCount(rows, function(r){return r.marca;});
+    var data = counts.map(function(c){return {label:c.k, n:c.n};});
     barRows(document.getElementById("cediChart"), data, function(){return "var(--accent)";}, 10);
   }
 
@@ -911,7 +931,7 @@
     document.getElementById("pendBody").innerHTML = sorted.map(function(r){
       var dias = r.fc ? Math.round((now-r.fc)/86400000) : null;
       return '<tr><td class="guia">'+esc(r.guia)+'</td><td class="cliente" title="'+esc(r.cliente)+'">'+esc(r.cliente)+
-        '</td><td>'+esc(shortCedi(r.cedi))+'</td><td>'+esc(r.ciudad)+'</td><td>'+estadoBadge(r.estado)+
+        '</td><td title="'+esc(r.cedi)+'">'+esc(r.marca)+'</td><td>'+esc(r.ciudad)+'</td><td>'+estadoBadge(r.estado)+
         '</td><td>'+fmtDate(r.fc)+'</td><td class="num">'+(dias!=null?dias:"&mdash;")+'</td></tr>';
     }).join("") || '<tr><td colspan="7" style="text-align:center;color:var(--ink-muted);padding:20px;">Sin servicios pendientes para este filtro</td></tr>';
     bindBadgeClicks(document.getElementById("pendBody"));
@@ -923,7 +943,7 @@
     document.getElementById("finBody").innerHTML = sorted.map(function(r){
       var dias = (r.fc&&r.ff) ? ((r.ff-r.fc)/86400000).toFixed(1) : "&mdash;";
       return '<tr><td class="guia">'+esc(r.guia)+'</td><td class="cliente" title="'+esc(r.cliente)+'">'+esc(r.cliente)+
-        '</td><td>'+esc(shortCedi(r.cedi))+'</td><td>'+esc(r.ciudad)+'</td><td>'+fmtDate(r.ff)+
+        '</td><td title="'+esc(r.cedi)+'">'+esc(r.marca)+'</td><td>'+esc(r.ciudad)+'</td><td>'+fmtDate(r.ff)+
         '</td><td class="num">'+dias+'</td></tr>';
     }).join("") || '<tr><td colspan="6" style="text-align:center;color:var(--ink-muted);padding:20px;">Sin servicios finalizados para este filtro</td></tr>';
   }
