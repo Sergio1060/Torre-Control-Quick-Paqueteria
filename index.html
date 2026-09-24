@@ -475,6 +475,7 @@
   var now = new Date(0);
   var STORE_CSV = "panelEntregas_csv", STORE_NAME = "panelEntregas_name";
   var CORRECTIONS = {};
+  var ENTREGAS_COORDINADORA = {};
 
   // ---------- CSV parsing ----------
   var CSV_REQUIRED = ["Estado","Cliente","CEDI","Ciudad","Fecha de creacion"];
@@ -531,13 +532,19 @@
         if(fcCorr) fc = fcCorr;
       }
       var ff = parseDate(r.fechaFinalizado);
+      var estado = r.estado;
+      var entregaCoord = ENTREGAS_COORDINADORA[(r.guia||"").trim()];
+      if(entregaCoord){
+        var ffCoord = parseDate(entregaCoord);
+        if(ffCoord){ ff = ffCoord; estado = "Finalizado"; }
+      }
       if(fc && fc>now) now = fc;
       if(ff && ff>now) now = ff;
       var cliente = (r.cliente||"").trim() || "(Sin nombre)";
       var cedi = (r.cedi||"").trim() || "(Sin CEDI)";
       var marca = brandOf(cedi);
       return {
-        guia:r.guia, ruta:r.ruta, estado:r.estado, cliente:cliente, cedi:cedi, marca:marca,
+        guia:r.guia, ruta:r.ruta, estado:estado, cliente:cliente, cedi:cedi, marca:marca,
         ciudad:(r.ciudad||"").trim() || "(Sin ciudad)",
         fc:fc, ff:ff, clienteKey:cliente+"|||"+marca
       };
@@ -672,11 +679,17 @@
     }
     loadSample();
   }
-  fetch("recolectado.json").then(function(r){return r.json();}).then(function(map){
+  var correctionsLoaded = fetch("recolectado.json").then(function(r){return r.json();}).then(function(map){
     CORRECTIONS = map || {};
   }).catch(function(){
     CORRECTIONS = {};
-  }).then(startWithSavedOrSample);
+  });
+  var entregasLoaded = fetch("entregas_coordinadora.json").then(function(r){return r.json();}).then(function(map){
+    ENTREGAS_COORDINADORA = map || {};
+  }).catch(function(){
+    ENTREGAS_COORDINADORA = {};
+  });
+  Promise.all([correctionsLoaded, entregasLoaded]).then(startWithSavedOrSample);
 
   document.getElementById("uploadBtn").addEventListener("click", function(){
     document.getElementById("csvInput").click();

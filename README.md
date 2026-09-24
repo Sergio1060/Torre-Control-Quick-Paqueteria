@@ -7,6 +7,7 @@ Tablero BI de servicios de entrega (KPIs, distribución por estado, cliente, ciu
 - `index.html` — el tablero completo.
 - `servicios.json` — datos de muestra que se cargan si no hay ningún CSV subido en el navegador.
 - `recolectado.json` — mapa guía → fecha de recolección (extraído de la hoja de Google Sheets de control), usado para corregir "Fecha de creación" cuando el CSV del día trae ese dato mal o vacío. Las guías que no aparecen ahí conservan su fecha original.
+- `entregas_coordinadora.json` — mapa guía → fecha real de entrega para las guías que Coordinadora ampara (consultado en coordinadora.com/rastreo). Al cargar cualquier CSV, esas guías se marcan como "Finalizado" con su fecha real. Solo incluye guías que Coordinadora ya reporta como "Entregado"; las que siguen en tránsito no se tocan.
 
 ## Actualizar los datos a diario
 
