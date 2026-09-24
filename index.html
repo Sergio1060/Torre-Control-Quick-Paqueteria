@@ -425,7 +425,8 @@
     "Despacho Nacional": "var(--cat-4)",
     "En Distribucion":   "var(--cat-5)",
     Reprogramar:   "var(--cat-6)",
-    Investigacion: "var(--cat-7)"
+    Investigacion: "var(--cat-7)",
+    "Transito Nacional": "var(--cat-8)"
   };
   function sane(d){
     // guards against single-digit typos in the source export (e.g. "2926" for
@@ -844,7 +845,7 @@
     });
     var counts = {};
     base.forEach(function(r){ counts[r.estado]=(counts[r.estado]||0)+1; });
-    var order = ["Finalizado","Cancelado","Despacho Nacional","En Bodega","Recolectado","Asignado","Investigacion","En Distribucion","Reprogramar"];
+    var order = ["Finalizado","Cancelado","Despacho Nacional","Transito Nacional","En Bodega","Recolectado","Asignado","Investigacion","En Distribucion","Reprogramar"];
     var data = order.filter(function(e){return counts[e]!=null;}).map(function(e){return {label:e, n:counts[e]||0};});
     Object.keys(counts).forEach(function(e){ if(order.indexOf(e)<0) data.push({label:e,n:counts[e]}); });
 
