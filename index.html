@@ -426,7 +426,14 @@
     "En Distribucion":   "var(--cat-5)",
     Reprogramar:   "var(--cat-6)",
     Investigacion: "var(--cat-7)",
-    "Transito Nacional": "var(--cat-8)"
+    "Transito Nacional": "var(--cat-8)",
+    // otro esquema de export usa estos nombres en vez de los de arriba;
+    // se reutiliza el color de la etapa análoga (no coexisten en el mismo archivo)
+    Aceptado:        "var(--cat-1)",
+    "En Alistamiento": "var(--cat-2)",
+    Llegado:         "var(--cat-3)",
+    "En Bodega Destino": "var(--cat-3)",
+    Devolucion:      "var(--cat-6)"
   };
   function sane(d){
     // guards against single-digit typos in the source export (e.g. "2926" for
@@ -845,7 +852,7 @@
     });
     var counts = {};
     base.forEach(function(r){ counts[r.estado]=(counts[r.estado]||0)+1; });
-    var order = ["Finalizado","Cancelado","Despacho Nacional","Transito Nacional","En Bodega","Recolectado","Asignado","Investigacion","En Distribucion","Reprogramar"];
+    var order = ["Finalizado","Cancelado","Despacho Nacional","Transito Nacional","En Bodega","En Bodega Destino","Llegado","Recolectado","En Alistamiento","Asignado","Aceptado","Investigacion","En Distribucion","Reprogramar","Devolucion"];
     var data = order.filter(function(e){return counts[e]!=null;}).map(function(e){return {label:e, n:counts[e]||0};});
     Object.keys(counts).forEach(function(e){ if(order.indexOf(e)<0) data.push({label:e,n:counts[e]}); });
 
