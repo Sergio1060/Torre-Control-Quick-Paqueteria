@@ -492,6 +492,7 @@
   var STORE_CSV = "panelEntregas_csv", STORE_NAME = "panelEntregas_name";
   var CORRECTIONS = {};
   var ENTREGAS_COORDINADORA = {};
+  var DEVOLUCIONES_COORDINADORA = {};
 
   // ---------- CSV parsing ----------
   var CSV_REQUIRED = ["Estado","Cliente","CEDI","Ciudad","Fecha de creacion"];
@@ -537,7 +538,7 @@
   // ---------- Data ingestion ----------
   function ingest(rawRows, sourceLabel, isUploaded){
     now = new Date(0);
-    var excluidosNoAsignado = 0, excluidosCancelado = 0;
+    var excluidosNoAsignado = 0, excluidosCancelado = 0, excluidosDevolucion = 0;
     ALL = rawRows.filter(function(r){
       var e = (r.estado||"").trim().toLowerCase();
       if(e==="no asignado"){ excluidosNoAsignado++; return false; }
@@ -552,10 +553,17 @@
       }
       var ff = parseDate(r.fechaFinalizado);
       var estado = r.estado;
-      var entregaCoord = ENTREGAS_COORDINADORA[(r.guia||"").trim()];
+      var guiaTrim = (r.guia||"").trim();
+      var entregaCoord = ENTREGAS_COORDINADORA[guiaTrim];
       if(entregaCoord){
         var ffCoord = parseDate(entregaCoord);
         if(ffCoord){ ff = ffCoord; estado = "Finalizado"; }
+      }
+      var devolucionCoord = DEVOLUCIONES_COORDINADORA[guiaTrim];
+      var esDevolucionCoordinadora = false;
+      if(devolucionCoord){
+        var ffDev = parseDate(devolucionCoord);
+        if(ffDev){ ff = ffDev; estado = "Devolucion"; esDevolucionCoordinadora = true; }
       }
       if(fc && fc>now) now = fc;
       if(ff && ff>now) now = ff;
@@ -565,8 +573,12 @@
       return {
         guia:r.guia, ruta:r.ruta, estado:estado, cliente:cliente, cedi:cedi, marca:marca,
         ciudad:(r.ciudad||"").trim() || "(Sin ciudad)",
-        fc:fc, ff:ff, clienteKey:cliente+"|||"+marca
+        fc:fc, ff:ff, clienteKey:cliente+"|||"+marca,
+        esDevolucionCoordinadora: esDevolucionCoordinadora
       };
+    }).filter(function(row){
+      if(row.esDevolucionCoordinadora){ excluidosDevolucion++; return false; }
+      return true;
     });
     state.cedi.clear(); state.cliente.clear(); state.ciudad.clear(); state.estado.clear();
     var emptyNotice = document.getElementById("emptyNotice");
@@ -728,7 +740,12 @@
   }).catch(function(){
     ENTREGAS_COORDINADORA = {};
   });
-  Promise.all([correctionsLoaded, entregasLoaded]).then(startWithSavedOrSample);
+  var devolucionesLoaded = fetch("devoluciones_coordinadora.json").then(function(r){return r.json();}).then(function(map){
+    DEVOLUCIONES_COORDINADORA = map || {};
+  }).catch(function(){
+    DEVOLUCIONES_COORDINADORA = {};
+  });
+  Promise.all([correctionsLoaded, entregasLoaded, devolucionesLoaded]).then(startWithSavedOrSample);
 
   document.getElementById("uploadBtn").addEventListener("click", function(){
     document.getElementById("csvInput").click();
