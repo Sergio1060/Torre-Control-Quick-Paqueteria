@@ -531,6 +531,7 @@
         cliente: col(fields,"Cliente"), cedi: col(fields,"CEDI"), ciudad: col(fields,"Ciudad"),
         localidad: col(fields,"Localidad"), fechaCreacion: col(fields,"Fecha de creacion"),
         fechaProgramada: col(fields,"Fecha"), fechaFinalizado: col(fields,"finalizado"),
+        fechaRecolectado: col(fields,"recolectado"),
         novedad: col(fields,"Novedad"), descNovedad: col(fields,"Descripcion de novedad"),
         valorFlete: col(fields,"Valor Flete"), conductor: col(fields,"Conductor")
       });
@@ -549,12 +550,18 @@
       if(e==="cancelado"){ excluidosCancelado++; return false; }
       return true;
     }).map(function(r){
+      // "Creado" shows the latest of three signals for when the service actually
+      // entered the pipeline: the raw Fecha de creacion, the Google Sheet's
+      // recolectado correction, and the CSV's own "recolectado" column (which is
+      // often more current than the Sheet and was previously ignored).
       var fc = parseDate(r.fechaCreacion);
       var corregida = CORRECTIONS[(r.guia||"").trim()];
       if(corregida){
         var fcCorr = parseDate(corregida);
-        if(fcCorr) fc = fcCorr;
+        if(fcCorr && (!fc || fcCorr>fc)) fc = fcCorr;
       }
+      var fcRecolCsv = parseDate(r.fechaRecolectado);
+      if(fcRecolCsv && (!fc || fcRecolCsv>fc)) fc = fcRecolCsv;
       var ff = parseDate(r.fechaFinalizado);
       var estado = r.estado;
       var guiaTrim = (r.guia||"").trim();
