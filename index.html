@@ -243,6 +243,9 @@
   }
   tbody td{padding:8px 10px; border-bottom:1px solid var(--grid); color:var(--ink-2); vertical-align:middle;}
   tbody tr:hover{background:var(--surface-2);}
+  tr.row-overdue{background:rgba(208,59,59,0.07);}
+  tr.row-overdue:hover{background:rgba(208,59,59,0.13);}
+  td.num-overdue{color:var(--critical); font-weight:600;}
   td.num, th.num{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums;}
   td.guia{color:var(--ink); font-family:"IBM Plex Mono",monospace; font-size:12px;}
   td.cliente{color:var(--ink); font-weight:500; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -486,6 +489,7 @@
     });
   }
 
+  var SLA_DIAS = 3;
   var state = { cedi:new Set(), cliente:new Set(), ciudad:new Set(), estado:new Set() };
   var ALL = [];
   var now = new Date(0);
@@ -824,8 +828,9 @@
     var avgGestion = gestionDias.length ? gestionDias.reduce(function(a,b){return a+b;},0)/gestionDias.length : null;
     var antigDias = pendientes.filter(function(r){return r.fc;}).map(function(r){return (now-r.fc)/86400000;});
     var avgAntig = antigDias.length ? antigDias.reduce(function(a,b){return a+b;},0)/antigDias.length : null;
+    var vencidos = pendientes.filter(function(r){return r.fc && (now-r.fc)/86400000>SLA_DIAS;}).length;
 
-    renderKpis(rows.length, finalizados.length, pendientes.length, avgGestion, avgAntig);
+    renderKpis(rows.length, finalizados.length, pendientes.length, avgGestion, avgAntig, vencidos);
     renderEstadoChart(rows);
     renderCediChart(rows);
     renderCiudadChart(rows);
@@ -834,12 +839,13 @@
     renderFinTable(finalizados);
   }
 
-  function renderKpis(total, fin, pend, avgGestion, avgAntig){
+  function renderKpis(total, fin, pend, avgGestion, avgAntig, vencidos){
     var pct = total ? Math.round(fin/total*100) : 0;
     var kpis = [
       {label:"Total servicios", value:total, sub:"excl. No asignado y Cancelado", cls:""},
       {label:"Finalizados", value:fin, sub:pct+"% del total", cls:"good"},
       {label:"Pendientes", value:pend, sub:avgAntig!=null ? ("prom. "+avgAntig.toFixed(1)+" d antig&uuml;edad") : "&mdash;", cls:"warning"},
+      {label:"&gt; "+SLA_DIAS+" d&iacute;as", value:vencidos, sub:vencidos>0 ? "fuera del plazo &mdash; revisar" : "ninguna fuera de plazo", cls:vencidos>0?"critical":"good"},
       {label:"Tiempo de gesti&oacute;n", value: avgGestion!=null ? avgGestion.toFixed(1) : "&mdash;", sub:"d&iacute;as promedio (creado &rarr; finalizado)", cls:""}
     ];
     document.getElementById("kpis").innerHTML = kpis.map(function(k){
@@ -996,12 +1002,15 @@
     var sorted = pend.slice().filter(function(r){return r.fc;}).sort(function(a,b){return a.fc-b.fc;});
     var withoutDate = pend.filter(function(r){return !r.fc;});
     sorted = sorted.concat(withoutDate);
-    document.getElementById("pendSub").innerHTML = sorted.length+" servicio(s) en gesti&oacute;n, ordenados por antig&uuml;edad";
+    var vencidas = sorted.filter(function(r){return r.fc && (now-r.fc)/86400000>SLA_DIAS;}).length;
+    document.getElementById("pendSub").innerHTML = sorted.length+" servicio(s) en gesti&oacute;n, ordenados por antig&uuml;edad"+
+      (vencidas>0 ? ' &mdash; <strong style="color:var(--critical)">'+vencidas+' con más de '+SLA_DIAS+' días</strong>' : "");
     document.getElementById("pendBody").innerHTML = sorted.map(function(r){
       var dias = r.fc ? Math.round((now-r.fc)/86400000) : null;
-      return '<tr><td class="guia">'+esc(r.guia)+'</td><td class="cliente" title="'+esc(r.cliente)+'">'+esc(r.cliente)+
+      var vencida = dias!=null && dias>SLA_DIAS;
+      return '<tr'+(vencida?' class="row-overdue"':'')+'><td class="guia">'+esc(r.guia)+'</td><td class="cliente" title="'+esc(r.cliente)+'">'+esc(r.cliente)+
         '</td><td title="'+esc(r.cedi)+'">'+esc(r.marca)+'</td><td>'+esc(r.ciudad)+'</td><td>'+estadoBadge(r.estado)+
-        '</td><td>'+fmtDate(r.fc)+'</td><td class="num">'+(dias!=null?dias:"&mdash;")+'</td></tr>';
+        '</td><td>'+fmtDate(r.fc)+'</td><td class="num'+(vencida?' num-overdue':'')+'">'+(dias!=null?dias:"&mdash;")+'</td></tr>';
     }).join("") || '<tr><td colspan="7" style="text-align:center;color:var(--ink-muted);padding:20px;">Sin servicios pendientes para este filtro</td></tr>';
     bindBadgeClicks(document.getElementById("pendBody"));
   }
